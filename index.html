@@ -77,8 +77,15 @@ main { max-width: 640px; margin: 0 auto; padding: 2rem 1.5rem; }
 .t-top   { display: flex; align-items: center; margin-bottom: 0.6rem; }
 .t-num   { font-size: 0.72rem; color: #aaa; }
 .t-score { margin-left: auto; font-size: 0.72rem; color: #aaa; }
-.pbar  { height: 3px; background: #eee; border-radius: 2px; margin-bottom: 1.8rem; overflow: hidden; }
-.pfill { height: 100%; background: #c0392b; transition: width 0.3s; border-radius: 2px; }
+.global-timer-bar-bg { height: 8px; background: #eee; border-radius: 4px; margin-bottom: 4px; overflow: hidden; }
+.global-timer-bar { height: 100%; background: #2d8a6e; border-radius: 4px; transition: width 0.3s linear, background 0.4s; }
+.global-timer-bar.warn { background: #e67e22; }
+.global-timer-bar.danger { background: #c0392b; }
+.global-timer-txt { font-size: 0.68rem; color: #aaa; text-align: right; margin-bottom: 1rem; font-weight: 500; }
+.q-timer-bg { height: 3px; background: #eee; border-radius: 2px; margin-bottom: 1.8rem; overflow: hidden; }
+.q-timer-fill { height: 100%; background: #2563a8; border-radius: 2px; transition: width 0.2s linear, background 0.3s; }
+.q-timer-fill.warn { background: #e67e22; }
+.q-timer-fill.danger { background: #c0392b; }
 .t-q { text-align: center; margin-bottom: 1.6rem; }
 .t-qlabel { font-size: 0.65rem; color: #bbb; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 0.8rem; }
 .t-word-ja   { font-family: 'Noto Serif JP', serif; font-size: 3rem; font-weight: 700; color: #1a1a1a; display: block; line-height: 1.1; }
@@ -194,7 +201,7 @@ main { max-width: 640px; margin: 0 auto; padding: 2rem 1.5rem; }
 <!-- BROWSE -->
 <div id="screen-browse" class="screen">
   <div class="browse-bar">
-    <input type="text" class="search" id="srch" placeholder="Cari kata atau arti..." oninput=renderBrowse()">
+    <input type="text" class="search" id="srch" placeholder="Cari kata atau arti..." oninput="renderBrowse()">
     <button class="fb on" data-blv="n3" onclick="toggleBLv(this)"><span class="badge n3">N3</span></button>
     <button class="fb on-r" data-blv="n2" onclick="toggleBLv(this)"><span class="badge n2">N2</span></button>
     <div class="browse-count" id="bc"></div>
@@ -235,13 +242,12 @@ main { max-width: 640px; margin: 0 auto; padding: 2rem 1.5rem; }
     </div>
 
     <div class="setup-group">
-      <label>Jumlah Soal</label>
-      <div class="opt-row">
-        <button class="opt" data-g="cnt" data-v="5" onclick="selO(this)">5</button>
-        <button class="opt sel" data-g="cnt" data-v="10" onclick="selO(this)">10</button>
-        <button class="opt" data-g="cnt" data-v="15" onclick="selO(this)">15</button>
-        <button class="opt" data-g="cnt" data-v="20" onclick="selO(this)">20</button>
-        <button class="opt" data-g="cnt" data-v="all" onclick="selO(this)">Semua</button>
+      <label>Mode Waktu</label>
+      <div style="font-size:0.78rem;color:#888;line-height:1.6;background:#f9f7f4;border:1px solid #e8e4df;border-radius:8px;padding:0.6rem 0.9rem;">
+        ⏳ Mulai dengan <strong>20 detik</strong><br>
+        ✅ Benar → <strong>+5 detik</strong><br>
+        ❌ Salah / timeout → <strong>−1 detik</strong><br>
+        🔁 Soal terus berulang hingga waktu habis
       </div>
     </div>
 
@@ -249,11 +255,15 @@ main { max-width: 640px; margin: 0 auto; padding: 2rem 1.5rem; }
   </div>
 
   <div class="test-live" id="test-live">
-    <div class="t-top">
-      <div class="t-num" id="t-num">1 / 10</div>
-      <div class="t-score" id="t-score">Benar: 0</div>
+    <div class="global-timer-bar-bg">
+      <div class="global-timer-bar" id="global-tbar" style="width:100%"></div>
     </div>
-    <div class="pbar"><div class="pfill" id="pfill" style="width:0%"></div></div>
+    <div class="global-timer-txt" id="global-ttxt">⏳ Sisa: 20.0s</div>
+    <div class="t-top">
+      <div class="t-num" id="t-num">Soal #1</div>
+      <div class="t-score" id="t-score">✓ 0 &nbsp; ✗ 0</div>
+    </div>
+    <div class="q-timer-bg"><div class="q-timer-fill" id="q-tbar" style="width:100%"></div></div>
     <div class="t-q">
       <div class="t-qlabel" id="t-label">Apa arti kata ini?</div>
       <span id="t-disp"></span>
@@ -267,18 +277,18 @@ main { max-width: 640px; margin: 0 auto; padding: 2rem 1.5rem; }
     <div class="t-fb" id="t-fb"></div>
   </div>
 
-  <div class=result" id=result">
-    <span class=res-sym" id=res-sym"></span>
-    <div class=res-title" id=res-title"></div>
-    <div class=res-score"><em id=rc">0</em> / <span id=rt">0</span></div>
-    <div class=res-pct" id=res-pct"></div>
-    <div class=res-bd">
-      <div class=res-bd-lbl">Kata yang salah</div>
+  <div class="result" id="result">
+    <span class="res-sym" id="res-sym"></span>
+    <div class="res-title" id="res-title"></div>
+    <div class="res-score"><em id="rc">0</em> / <span id="rt">0</span></div>
+    <div class="res-pct" id="res-pct"></div>
+    <div class="res-bd">
+      <div class="res-bd-lbl">Kata yang salah</div>
       <div class="missed" id="missed"></div>
     </div>
-    <div class=res-btns">
-      <button class=rbtn pri" onclick=retryTest()">Ulangi</button>
-      <button class=rbtn sec" onclick="backSetup()">Pengaturan Baru</button>
+    <div class="res-btns">
+      <button class="rbtn pri" onclick="retryTest()">Ulangi</button>
+      <button class="rbtn sec" onclick="backSetup()">Pengaturan Baru</button>
     </div>
   </div>
 </div>
@@ -2422,8 +2432,6 @@ var VOCAB = [
 var deck = [], deckIdx = 0, isFlipped = false;
 var showN3 = true, showN2 = true, curCat = 'all', activeCatBtn = null;
 var browseN3 = true, browseN2 = true;
-var cfg = { lv: 'both', mode: 'w2m', fmt: 'mc', cnt: '10' };
-var tQ = [], tIdx = 0, tOk = 0, tMissed = [], tMode = 'w2m';
 
 function goScreen(id, btn) {
   var i, screens = document.querySelectorAll('.screen');
@@ -2592,6 +2600,17 @@ function selO(btn) {
   cfg[g] = btn.getAttribute('data-v');
 }
 
+var cfg = { lv: 'both', mode: 'w2m', fmt: 'mc', cnt: '10' };
+var tQ = [], tIdx = 0, tOk = 0, tWrong = 0, tMissed = [], tMode = 'w2m';
+var tTotal = 0;
+var usedIdx = [];
+var globalTime = 20;
+var globalTimerInt = null;
+var GT_MAX = 20;
+var qTimerInt = null;
+var qTimeLeft = 0;
+var qTimeMax = 6;
+
 function getPool() {
   var pool = [], i, v;
   for (i = 0; i < VOCAB.length; i++) {
@@ -2606,28 +2625,73 @@ function getPool() {
 function startTest() {
   var pool = getPool();
   if (!pool.length) return;
-  var s = pool.slice().sort(function() { return Math.random() - 0.5; });
-  var n = cfg.cnt === 'all' ? s.length : Math.min(parseInt(cfg.cnt), s.length);
-  tQ = s.slice(0, n); tIdx = 0; tOk = 0; tMissed = [];
+  tQ = pool.slice().sort(function() { return Math.random() - 0.5; });
+  usedIdx = [];
+  tIdx = 0; tOk = 0; tWrong = 0; tMissed = []; tTotal = 0;
+  globalTime = 20; GT_MAX = 20;
+  qTimeMax = 6;
   document.getElementById('test-setup').style.display = 'none';
   document.getElementById('test-live').classList.add('on');
   document.getElementById('result').classList.remove('on');
+  startGlobalTimer();
   showQ();
 }
 
-function getMode() {
-  if (cfg.mode === 'mixed') return Math.random() < 0.5 ? 'w2m' : 'm2w';
-  return cfg.mode;
+function startGlobalTimer() {
+  clearInterval(globalTimerInt);
+  globalTimerInt = setInterval(function() {
+    globalTime = Math.max(0, parseFloat((globalTime - 0.1).toFixed(1)));
+    updateGlobalTimerUI();
+    if (globalTime <= 0) {
+      clearInterval(globalTimerInt);
+      clearInterval(qTimerInt);
+      showResult();
+    }
+  }, 100);
+}
+
+function updateGlobalTimerUI() {
+  var bar = document.getElementById('global-tbar');
+  var txt = document.getElementById('global-ttxt');
+  if (!bar) return;
+  var pct = Math.min(100, (globalTime / GT_MAX) * 100);
+  bar.style.width = pct + '%';
+  bar.className = 'global-timer-bar' + (pct < 20 ? ' danger' : pct < 40 ? ' warn' : '');
+  if (txt) txt.textContent = '⏳ Sisa waktu: ' + globalTime.toFixed(1) + 's';
+}
+
+function updateQTimerUI() {
+  var bar = document.getElementById('q-tbar');
+  if (!bar) return;
+  var pct = Math.max(0, (qTimeLeft / qTimeMax) * 100);
+  bar.style.width = pct + '%';
+  bar.className = 'q-timer-fill' + (pct < 30 ? ' danger' : pct < 55 ? ' warn' : '');
+}
+
+function pickNext() {
+  if (usedIdx.length >= tQ.length) {
+    usedIdx = [];
+    tQ = tQ.sort(function() { return Math.random() - 0.5; });
+  }
+  var idx, tries = 0;
+  do {
+    idx = Math.floor(Math.random() * tQ.length);
+    tries++;
+    if (tries > 300) { usedIdx = []; break; }
+  } while (usedIdx.indexOf(idx) >= 0);
+  usedIdx.push(idx);
+  return idx;
 }
 
 function showQ() {
   var q, dispEl, hrEl, inp;
-  if (tIdx >= tQ.length) { showResult(); return; }
+  if (globalTime <= 0) return;
+  tIdx = pickNext();
   q = tQ[tIdx];
   tMode = getMode();
-  document.getElementById('t-num').textContent = (tIdx + 1) + ' / ' + tQ.length;
-  document.getElementById('t-score').textContent = 'Benar: ' + tOk;
-  document.getElementById('pfill').style.width = (tIdx / tQ.length * 100) + '%';
+
+  document.getElementById('t-num').textContent = 'Soal #' + (tTotal + 1);
+  document.getElementById('t-score').textContent = '✓ ' + tOk + '  ✗ ' + tWrong;
   document.getElementById('t-fb').textContent = '';
   document.getElementById('t-fb').className = 't-fb';
 
@@ -2660,6 +2724,44 @@ function showQ() {
     inp.placeholder = tMode === 'w2m' ? 'ketik arti...' : 'ketik kata Jepang...';
     inp.focus();
   }
+
+  // Per-question countdown
+  clearInterval(qTimerInt);
+  qTimeLeft = qTimeMax;
+  updateQTimerUI();
+  qTimerInt = setInterval(function() {
+    qTimeLeft = Math.max(0, parseFloat((qTimeLeft - 0.1).toFixed(1)));
+    updateQTimerUI();
+    if (qTimeLeft <= 0) {
+      clearInterval(qTimerInt);
+      handleQTimeout();
+    }
+  }, 100);
+}
+
+function handleQTimeout() {
+  var q = tQ[tIdx];
+  var all = document.querySelectorAll('.choice');
+  var i;
+  for (i = 0; i < all.length; i++) {
+    all[i].disabled = true;
+    if (all[i].getAttribute('data-key') === q.w) all[i].classList.add('correct');
+  }
+  var inp = document.getElementById('t-inp');
+  if (inp && !inp.disabled) { inp.disabled = true; inp.classList.add('ng'); }
+  tWrong++;
+  tTotal++;
+  globalTime = Math.max(0, parseFloat((globalTime - 1).toFixed(1)));
+  if (qTimeMax > 3) qTimeMax = Math.max(3, qTimeMax - 0.5);
+  setFb('⏱ Waktu habis! Jawaban: ' + q.w + ' = ' + q.mean, 'ng');
+  if (!tMissed.find(function(m){ return m.w === q.w; })) tMissed.push(q);
+  updateGlobalTimerUI();
+  setTimeout(function() { if (globalTime > 0) showQ(); }, 1200);
+}
+
+function getMode() {
+  if (cfg.mode === 'mixed') return Math.random() < 0.5 ? 'w2m' : 'm2w';
+  return cfg.mode;
 }
 
 function renderChoices(q) {
@@ -2682,26 +2784,35 @@ function renderChoices(q) {
 }
 
 function checkChoice(btn, q) {
+  clearInterval(qTimerInt);
   var i, all = document.querySelectorAll('.choice');
   for (i = 0; i < all.length; i++) {
     all[i].disabled = true;
     if (all[i].getAttribute('data-key') === q.w) all[i].classList.add('correct');
   }
+  tTotal++;
   if (btn.getAttribute('data-key') === q.w) {
     tOk++;
-    setFb('Benar!', 'ok');
+    globalTime = parseFloat((globalTime + 5).toFixed(1));
+    qTimeMax = Math.min(qTimeMax + 0.5, 10);
+    setFb('✓ Benar! +5 detik', 'ok');
   } else {
     btn.classList.add('wrong');
-    tMissed.push(q);
-    setFb('Salah  ' + q.w + ' = ' + q.mean, 'ng');
+    tWrong++;
+    globalTime = Math.max(0, parseFloat((globalTime - 1).toFixed(1)));
+    if (qTimeMax > 3) qTimeMax = Math.max(3, qTimeMax - 0.5);
+    if (!tMissed.find(function(m){ return m.w === q.w; })) tMissed.push(q);
+    setFb('✗ Salah. Jawaban: ' + q.w + ' = ' + q.mean, 'ng');
   }
-  setTimeout(function() { tIdx++; showQ(); }, 1100);
+  updateGlobalTimerUI();
+  setTimeout(function() { if (globalTime > 0) showQ(); }, 1200);
 }
 
 function checkType() {
   var inp = document.getElementById('t-inp');
   var val = inp.value.trim().toLowerCase();
   if (!val) return;
+  clearInterval(qTimerInt);
   var q = tQ[tIdx];
   var ok = false, i, parts;
   inp.disabled = true;
@@ -2713,12 +2824,23 @@ function checkType() {
   } else {
     ok = val === q.w || val === q.r;
   }
+  tTotal++;
   if (ok) {
-    tOk++; inp.classList.add('ok'); setFb('Benar!', 'ok');
+    tOk++;
+    globalTime = parseFloat((globalTime + 5).toFixed(1));
+    qTimeMax = Math.min(qTimeMax + 0.5, 10);
+    inp.classList.add('ok');
+    setFb('✓ Benar! +5 detik', 'ok');
   } else {
-    inp.classList.add('ng'); tMissed.push(q); setFb('Salah  ' + q.w + ' = ' + q.mean, 'ng');
+    inp.classList.add('ng');
+    tWrong++;
+    globalTime = Math.max(0, parseFloat((globalTime - 1).toFixed(1)));
+    if (qTimeMax > 3) qTimeMax = Math.max(3, qTimeMax - 0.5);
+    if (!tMissed.find(function(m){ return m.w === q.w; })) tMissed.push(q);
+    setFb('✗ Salah. Jawaban: ' + q.w + ' = ' + q.mean, 'ng');
   }
-  setTimeout(function() { tIdx++; showQ(); }, 1100);
+  updateGlobalTimerUI();
+  setTimeout(function() { if (globalTime > 0) showQ(); }, 1200);
 }
 
 function setFb(msg, cls) {
@@ -2728,24 +2850,25 @@ function setFb(msg, cls) {
 }
 
 function showResult() {
+  clearInterval(globalTimerInt);
+  clearInterval(qTimerInt);
   var pct, ml, i, el;
   document.getElementById('test-live').classList.remove('on');
-  document.getElementById('pfill').style.width = '100%';
   document.getElementById('result').classList.add('on');
-  pct = Math.round(tOk / tQ.length * 100);
+  pct = tTotal > 0 ? Math.round(tOk / tTotal * 100) : 0;
   document.getElementById('rc').textContent = tOk;
-  document.getElementById('rt').textContent = tQ.length;
+  document.getElementById('rt').textContent = tTotal;
   if (pct >= 80) {
-    document.getElementById('res-sym').textContent = '\u5408\u683c';
-    document.getElementById('res-title').textContent = 'Bagus Sekali!';
+    document.getElementById('res-sym').textContent = '合格';
+    document.getElementById('res-title').textContent = 'Luar Biasa!';
   } else if (pct >= 50) {
-    document.getElementById('res-sym').textContent = '\u982d\u5f35\u308c';
+    document.getElementById('res-sym').textContent = '頑張れ';
     document.getElementById('res-title').textContent = 'Terus Berlatih!';
   } else {
-    document.getElementById('res-sym').textContent = '\u7df4\u7fd2';
+    document.getElementById('res-sym').textContent = '練習';
     document.getElementById('res-title').textContent = 'Perlu Lebih Banyak Latihan';
   }
-  document.getElementById('res-pct').textContent = 'Akurasi ' + pct + '% dari ' + tQ.length + ' soal';
+  document.getElementById('res-pct').textContent = 'Akurasi ' + pct + '% — ' + tOk + ' benar dari ' + tTotal + ' soal';
   ml = document.getElementById('missed');
   ml.innerHTML = '';
   if (!tMissed.length) {
@@ -2763,8 +2886,13 @@ function showResult() {
   }
 }
 
-function retryTest() { document.getElementById('result').classList.remove('on'); startTest(); }
+function retryTest() {
+  document.getElementById('result').classList.remove('on');
+  startTest();
+}
 function backSetup() {
+  clearInterval(globalTimerInt);
+  clearInterval(qTimerInt);
   document.getElementById('result').classList.remove('on');
   document.getElementById('test-live').classList.remove('on');
   document.getElementById('test-setup').style.display = '';
