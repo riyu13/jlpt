@@ -126,6 +126,12 @@ main { max-width: 640px; margin: 0 auto; padding: 2rem 1.5rem; }
 .rbtn.pri:hover { background: #c0392b; color: #fff; }
 .rbtn.sec { border-color: #e0dbd5; color: #888; }
 .rbtn.sec:hover { border-color: #bbb; color: #333; }
+.pagination { display: flex; justify-content: center; align-items: center; gap: 4px; margin-top: 1.5rem; flex-wrap: wrap; }
+.pg-btn { min-width: 34px; height: 34px; padding: 0 8px; background: #fff; border: 1px solid #e0dbd5; border-radius: 7px; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; color: #666; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
+.pg-btn:hover:not(:disabled) { border-color: #c0392b; color: #c0392b; }
+.pg-btn.active { background: #c0392b; border-color: #c0392b; color: #fff; font-weight: 500; }
+.pg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.pg-ellipsis { font-size: 0.78rem; color: #bbb; padding: 0 4px; }
 .modal-bg { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.35); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 1rem; }
 .modal-bg.on { display: flex; }
 .modal { background: #fff; border-radius: 12px; width: 100%; max-width: 360px; padding: 1.8rem; position: relative; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
@@ -207,6 +213,7 @@ main { max-width: 640px; margin: 0 auto; padding: 2rem 1.5rem; }
     <div class="browse-count" id="bc"></div>
   </div>
   <div class="word-grid" id="word-grid"></div>
+  <div class="pagination" id="pagination"></div>
 </div>
 
 <!-- TEST -->
@@ -2553,21 +2560,40 @@ function toggleBLv(btn) {
   renderBrowse();
 }
 
+var browsePage = 1;
+var browsePageSize = 40;
+var browsePool = [];
+
 function renderBrowse() {
-  var i, v, q, pool, el, g;
+  var i, v, q, el, g;
   q = (document.getElementById('srch').value || '').toLowerCase();
-  pool = [];
+  browsePool = [];
   for (i = 0; i < VOCAB.length; i++) {
     v = VOCAB[i];
     if (v.lvl === 'n3' && !browseN3) continue;
     if (v.lvl === 'n2' && !browseN2) continue;
     if (q && v.w.indexOf(q) < 0 && v.mean.toLowerCase().indexOf(q) < 0 && v.r.indexOf(q) < 0) continue;
-    pool.push(v);
+    browsePool.push(v);
   }
-  document.getElementById('bc').textContent = pool.length + ' kata';
+  // Reset to page 1 when filter/search changes
+  browsePage = 1;
+  renderBrowsePage();
+}
+
+function renderBrowsePage() {
+  var i, el, g, start, end, pagePool;
+  var totalPages = Math.ceil(browsePool.length / browsePageSize);
+  if (browsePage < 1) browsePage = 1;
+  if (browsePage > totalPages) browsePage = totalPages || 1;
+
+  start = (browsePage - 1) * browsePageSize;
+  end = Math.min(start + browsePageSize, browsePool.length);
+  pagePool = browsePool.slice(start, end);
+
+  document.getElementById('bc').textContent = browsePool.length + ' kata';
   g = document.getElementById('word-grid');
   g.innerHTML = '';
-  for (i = 0; i < pool.length; i++) {
+  for (i = 0; i < pagePool.length; i++) {
     (function(item) {
       el = document.createElement('div');
       el.className = 'word-tile';
@@ -2577,8 +2603,57 @@ function renderBrowse() {
         '<div class="tile-lv"><span class="badge ' + item.lvl + '">' + item.lvl.toUpperCase() + '</span></div>';
       el.onclick = function() { openModal(item); };
       g.appendChild(el);
-    })(pool[i]);
+    })(pagePool[i]);
   }
+  renderPagination(totalPages);
+  // Scroll to top of grid
+  g.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderPagination(totalPages) {
+  var pg = document.getElementById('pagination');
+  pg.innerHTML = '';
+  if (totalPages <= 1) return;
+
+  function mkBtn(label, page, isActive, isDisabled) {
+    var btn = document.createElement('button');
+    btn.className = 'pg-btn' + (isActive ? ' active' : '');
+    btn.textContent = label;
+    btn.disabled = !!isDisabled;
+    if (!isDisabled && !isActive) {
+      btn.onclick = function() { browsePage = page; renderBrowsePage(); };
+    }
+    return btn;
+  }
+
+  // Prev
+  pg.appendChild(mkBtn('←', browsePage - 1, false, browsePage === 1));
+
+  // Page numbers with ellipsis
+  var pages = [];
+  if (totalPages <= 7) {
+    for (var p = 1; p <= totalPages; p++) pages.push(p);
+  } else {
+    pages.push(1);
+    if (browsePage > 3) pages.push('...');
+    for (var p2 = Math.max(2, browsePage - 1); p2 <= Math.min(totalPages - 1, browsePage + 1); p2++) pages.push(p2);
+    if (browsePage < totalPages - 2) pages.push('...');
+    pages.push(totalPages);
+  }
+
+  for (var j = 0; j < pages.length; j++) {
+    if (pages[j] === '...') {
+      var span = document.createElement('span');
+      span.className = 'pg-ellipsis';
+      span.textContent = '...';
+      pg.appendChild(span);
+    } else {
+      pg.appendChild(mkBtn(pages[j], pages[j], pages[j] === browsePage, false));
+    }
+  }
+
+  // Next
+  pg.appendChild(mkBtn('→', browsePage + 1, false, browsePage === totalPages));
 }
 
 function openModal(v) {
@@ -2743,9 +2818,10 @@ function handleQTimeout() {
   var q = tQ[tIdx];
   var all = document.querySelectorAll('.choice');
   var i;
+  var correctKey = tMode === 'w2m' ? q.mean : q.w;
   for (i = 0; i < all.length; i++) {
     all[i].disabled = true;
-    if (all[i].getAttribute('data-key') === q.w) all[i].classList.add('correct');
+    if (all[i].getAttribute('data-key') === correctKey) all[i].classList.add('correct');
   }
   var inp = document.getElementById('t-inp');
   if (inp && !inp.disabled) { inp.disabled = true; inp.classList.add('ng'); }
@@ -2775,8 +2851,9 @@ function renderChoices(q) {
     (function(c, correctQ) {
       var btn = document.createElement('button');
       btn.className = 'choice';
-      btn.setAttribute('data-key', c.w);
-      btn.textContent = tMode === 'w2m' ? c.mean : c.w;
+      var key = tMode === 'w2m' ? c.mean : c.w;
+      btn.setAttribute('data-key', key);
+      btn.textContent = key;
       btn.onclick = function() { checkChoice(btn, correctQ); };
       wrap.appendChild(btn);
     })(choices[i], q);
@@ -2786,12 +2863,13 @@ function renderChoices(q) {
 function checkChoice(btn, q) {
   clearInterval(qTimerInt);
   var i, all = document.querySelectorAll('.choice');
+  var correctKey = tMode === 'w2m' ? q.mean : q.w;
   for (i = 0; i < all.length; i++) {
     all[i].disabled = true;
-    if (all[i].getAttribute('data-key') === q.w) all[i].classList.add('correct');
+    if (all[i].getAttribute('data-key') === correctKey) all[i].classList.add('correct');
   }
   tTotal++;
-  if (btn.getAttribute('data-key') === q.w) {
+  if (btn.getAttribute('data-key') === correctKey) {
     tOk++;
     globalTime = parseFloat((globalTime + 5).toFixed(1));
     qTimeMax = Math.min(qTimeMax + 0.5, 10);
